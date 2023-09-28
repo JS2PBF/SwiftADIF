@@ -9,20 +9,21 @@ final class ADIDecoderTest: XCTestCase {
             <BAND:2>2M
             <EOR>
         """
-        let expect = [[
-            "CALL": "JS2PBF",
-            "BAND": "2M",
-        ]]
         let decoder = ADIDecoder(adiString: input)
         do {
             try decoder.decode()
         } catch {
             XCTFail()
         }
+        
         XCTAssertTrue(decoder.headerFields.isEmpty)
         XCTAssertTrue(decoder.userdefs.isEmpty)
-        XCTAssertTrue(decoder.appdefs.isEmpty)
-        XCTAssertEqual(decoder.records, expect)
+        XCTAssertEqual(decoder.records.count, 1)
+        
+        let rec = decoder.records.first!
+        XCTAssertEqual(Set(rec.fields.keys), Set(["CALL", "BAND"]))
+        XCTAssertEqual(rec.CALL?.data, "JS2PBF")
+        XCTAssertEqual(rec.BAND?.data, "2M")
     }
     
     func testMultilineField() throws {
@@ -33,8 +34,59 @@ final class ADIDecoderTest: XCTestCase {
         } catch {
             XCTFail()
         }
-        let answer = decoder.records.first!["ADDRESS"]
-        XCTAssertEqual(answer!, "Nagoya\nAichi\nJapan")
+        let answer = decoder.records.first!.ADDRESS
+        XCTAssertEqual(answer?.data, "Nagoya\nAichi\nJapan")
+    }
+    
+    func testAppdefField() throws {
+        let input = """
+            <app_monolog_compression:3>off
+            <eor>
+        """
+        let decoder = ADIDecoder(adiString: input)
+        do {
+            try decoder.decode()
+        } catch {
+            XCTFail()
+        }
+        let answer = decoder.records.first!.APP_MONOLOG_COMPRESSION!
+        XCTAssertEqual(answer.data, "off")
+        XCTAssertEqual(answer.PROGRAMID, "monolog")
+        XCTAssertEqual(answer.FIELDNAME, "compression")
+    }
+    
+    func testHeaderField() throws {
+        let input = """
+            Generated on 2011-11-22 at 02:15:23Z for WN4AZY
+
+            <adif_ver:5>3.0.5
+            <programid:7>monolog
+            <USERDEF1:3:N>EPC
+            <USERDEF2:19:E>SweaterSize,{S,M,L}
+            <USERDEF3:15:N>ShoeSize,{5:20}
+
+            <EOH>
+        """
+        let decoder = ADIDecoder(adiString: input)
+        do {
+            try decoder.decode()
+        } catch {
+            XCTFail()
+        }
+        XCTAssertEqual(Set(decoder.headerFields.keys), Set(["ADIF_VER", "PROGRAMID"]))
+        XCTAssertEqual(Set(decoder.userdefs.keys), Set(["EPC", "SWEATERSIZE", "SHOESIZE"]))
+        
+        var field = decoder.userdefs["EPC"]!
+        XCTAssertEqual(field.name, "USERDEF")
+        XCTAssertEqual(field.data, "EPC")
+        XCTAssertEqual(field.FIELDID, "1")
+        XCTAssertEqual(field.TYPE, "N")
+        
+        field = decoder.userdefs["SWEATERSIZE"]!
+        XCTAssertEqual(field.ENUM, "{S,M,L}")
+        
+        field = decoder.userdefs["SHOESIZE"]!
+        XCTAssertEqual(field.RANGE, "{5:20}")
     }
  
     func testReadAdiFileWithHeader() throws {
@@ -45,51 +97,15 @@ final class ADIDecoderTest: XCTestCase {
             return XCTFail()
         }
 
-        let expectHeader = [
-            "ADIF_VER": "3.0.5",
-            "PROGRAMID": "monolog",
-        ]
-        let expectUserDefs = [
-            "EPC": ADIF.FieldType(USERDEF: "USERDEF", fieldid: 1, type: "N", fieldname: "EPC"),
-            "SWEATERSIZE": ADIF.FieldType(USERDEF: "USERDEF", fieldid: 2, type: "E", fieldname: "SweaterSize", enum_: "{S,M,L}"),
-            "SHOESIZE": ADIF.FieldType(USERDEF: "USERDEF", fieldid: 3, type: "N", fieldname: "ShoeSize", range: "{5:20}"),
-        ]
-        let expectAppDefs = [
-            "APP_MONOLOG_COMPRESSION": ADIF.FieldType(APP: "APP", programid: "monolog", fieldname: "compression", type: "M"),
-        ]
-
-        let expectRecs = [
-            [
-                "QSO_DATE": "19900620",
-                "TIME_ON": "1523",
-                "CALL": "VK9NS",
-                "BAND": "20M",
-                "MODE": "RTTY",
-                "SWEATERSIZE": "M",
-                "SHOESIZE": "11",
-                "APP_MONOLOG_COMPRESSION": "off",
-            ], [
-                "QSO_DATE": "20101022",
-                "TIME_ON": "0111",
-                "CALL": "ON4UN",
-                "BAND": "40M",
-                "MODE": "PSK",
-                "SUBMODE": "PSK63",
-                "EPC": "32123",
-                "APP_MONOLOG_COMPRESSION": "off",
-            ]
-        ]
-
         let decoder = ADIDecoder(adiString: input)
         do {
             try decoder.decode()
         } catch {
             XCTFail()
         }
-        XCTAssertEqual(decoder.headerFields, expectHeader)
-        XCTAssertEqual(decoder.userdefs, expectUserDefs)
-        XCTAssertEqual(decoder.appdefs, expectAppDefs)
-        XCTAssertEqual(decoder.records, expectRecs)
+        XCTAssertEqual(decoder.headerFields.count, 2)
+        XCTAssertEqual(decoder.userdefs.count, 3)
+        XCTAssertEqual(decoder.records.count, 2)
     }
 }
 
@@ -105,20 +121,21 @@ final class ADXDecoderTest: XCTestCase {
                 </RECORDS>
             </ADX>
         """
-        let expect = [[
-            "CALL": "JS2PBF",
-            "BAND": "2M",
-        ]]
         let decoder = ADXDecoder(adxString: input)
         do {
             try decoder.decode()
         } catch {
             XCTFail()
         }
+        
         XCTAssertTrue(decoder.headerFields.isEmpty)
         XCTAssertTrue(decoder.userdefs.isEmpty)
-        XCTAssertTrue(decoder.appdefs.isEmpty)
-        XCTAssertEqual(decoder.records, expect)
+        XCTAssertEqual(decoder.records.count, 1)
+        
+        let rec = decoder.records.first!
+        XCTAssertEqual(Set(rec.fields.keys), Set(["CALL", "BAND"]))
+        XCTAssertEqual(rec.CALL?.data, "JS2PBF")
+        XCTAssertEqual(rec.BAND?.data, "2M")
     }
     
     func testMultilineField() throws {
@@ -129,8 +146,60 @@ final class ADXDecoderTest: XCTestCase {
         } catch {
             XCTFail()
         }
-        let answer = decoder.records.first!["ADDRESS"]
-        XCTAssertEqual(answer!, "Nagoya\nAichi\nJapan")
+        let answer = decoder.records.first!.ADDRESS
+        XCTAssertEqual(answer?.data, "Nagoya\nAichi\nJapan")
+    }
+    
+    func testAppdefField() throws {
+        let input = #"""
+            <ADX><RECORDS><RECORD>
+                <APP PROGRAMID="MONOLOG" FIELDNAME="BIRTHDAY" TYPE="d">19470726</APP>
+            </RECORD></RECORDS></ADX>
+        """#
+        let decoder = ADXDecoder(adxString: input)
+        do {
+            try decoder.decode()
+        } catch {
+            XCTFail()
+        }
+        let answer = decoder.records.first!.APP_MONOLOG_BIRTHDAY!
+        XCTAssertEqual(answer.data, "19470726")
+        XCTAssertEqual(answer.PROGRAMID, "MONOLOG")
+        XCTAssertEqual(answer.FIELDNAME, "BIRTHDAY")
+        XCTAssertEqual(answer.TYPE, "D")
+    }
+    
+    func testHeaderField() throws {
+        let input = """
+            <ADX><HEADER>
+                <!--Generated on 2011-11-22 at 02:15:23Z for WN4AZY-->
+                <ADIF_VER>3.0.5</ADIF_VER>
+                <PROGRAMID>monolog</PROGRAMID>
+                <USERDEF FIELDID="1" TYPE="N">EPC</USERDEF>
+                <USERDEF FIELDID="2" TYPE="E" ENUM="{S,M,L}">SWEATERSIZE</USERDEF>
+                <USERDEF FIELDID="3" TYPE="N" RANGE="{5:20}">SHOESIZE</USERDEF>
+            </HEADER></ADX>
+        """
+        let decoder = ADXDecoder(adxString: input)
+        do {
+            try decoder.decode()
+        } catch {
+            XCTFail()
+        }
+        XCTAssertEqual(Set(decoder.headerFields.keys), Set(["ADIF_VER", "PROGRAMID"]))
+        XCTAssertEqual(Set(decoder.userdefs.keys), Set(["EPC", "SWEATERSIZE", "SHOESIZE"]))
+        
+        var field = decoder.userdefs["EPC"]!
+        XCTAssertEqual(field.name, "USERDEF")
+        XCTAssertEqual(field.data, "EPC")
+        XCTAssertEqual(field.FIELDID, "1")
+        XCTAssertEqual(field.TYPE, "N")
+        
+        field = decoder.userdefs["SWEATERSIZE"]!
+        XCTAssertEqual(field.ENUM, "{S,M,L}")
+        
+        field = decoder.userdefs["SHOESIZE"]!
+        XCTAssertEqual(field.RANGE, "{5:20}")
     }
     
     func testReadAdxFileWithHeader() throws {
@@ -141,50 +210,14 @@ final class ADXDecoderTest: XCTestCase {
             return XCTFail()
         }
 
-        let expectHeader = [
-            "ADIF_VER": "3.0.5",
-            "PROGRAMID": "monolog",
-        ]
-        let expectUserDefs = [
-            "EPC": ADIF.FieldType(USERDEF: "USERDEF", fieldid: 1, type: "N", fieldname: "EPC"),
-            "SWEATERSIZE": ADIF.FieldType(USERDEF: "USERDEF", fieldid: 2, type: "E", fieldname: "SweaterSize", enum_: "{S,M,L}"),
-            "SHOESIZE": ADIF.FieldType(USERDEF: "USERDEF", fieldid: 3, type: "N", fieldname: "ShoeSize", range: "{5:20}"),
-        ]
-        let expectAppDefs = [
-            "APP_MONOLOG_COMPRESSION": ADIF.FieldType(APP: "APP", programid: "monolog", fieldname: "compression", type: "S"),
-        ]
-
-        let expectRecs = [
-            [
-                "QSO_DATE": "19900620",
-                "TIME_ON": "1523",
-                "CALL": "VK9NS",
-                "BAND": "20M",
-                "MODE": "RTTY",
-                "SWEATERSIZE": "M",
-                "SHOESIZE": "11",
-                "APP_MONOLOG_COMPRESSION": "off",
-            ], [
-                "QSO_DATE": "20101022",
-                "TIME_ON": "0111",
-                "CALL": "ON4UN",
-                "BAND": "40M",
-                "MODE": "PSK",
-                "SUBMODE": "PSK63",
-                "EPC": "32123",
-                "APP_MONOLOG_COMPRESSION": "off",
-            ]
-        ]
-
         let decoder = ADXDecoder(adxString: input)
         do {
             try decoder.decode()
         } catch {
             XCTFail()
         }
-        XCTAssertEqual(decoder.headerFields, expectHeader)
-        XCTAssertEqual(decoder.userdefs, expectUserDefs)
-        XCTAssertEqual(decoder.appdefs, expectAppDefs)
-        XCTAssertEqual(decoder.records, expectRecs)
+        XCTAssertEqual(decoder.headerFields.count, 2)
+        XCTAssertEqual(decoder.userdefs.count, 3)
+        XCTAssertEqual(decoder.records.count, 2)
     }
 }

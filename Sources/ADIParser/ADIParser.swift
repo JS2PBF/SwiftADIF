@@ -4,7 +4,7 @@ import RegexBuilder
 import ADIFValidator
 
 
-/// The errors will occor during ADI parsering.
+/// The errors for ADI parsering.
 public enum ADIParseError: Error, LocalizedError {
     case noDelegate
     
@@ -21,10 +21,10 @@ public enum ADIParseError: Error, LocalizedError {
 open class ADIParser {
     private let rawString: String
     
-    /// Initializes a parser with the URL of an ADI document.
+    /// Creates a new instance of an ADIParser from the URL of a ADI document.
     /// - Parameters:
-    ///   - url: URL of an ADI document.
-    ///   - delegate: Delegate object that receives messages about the parsing process.
+    ///   - url: The URL of an ADI document.
+    ///   - delegate: A delegate object that receives messages about the parsing process.
     public convenience init?(contentsOf url: URL, ADIParserDelegate delegate: (any ADIParserDelegate)? = nil) {
         guard let string = try? String(contentsOf: url, encoding: .utf8) else {
             return nil
@@ -32,20 +32,20 @@ open class ADIParser {
         self.init(string: string, ADIParserDelegate: delegate)
     }
     
-    /// Initializes a parser with the ADI string.
+    /// Creates a new instance of an ADIParser from a string of a ADI document.
     /// - Parameters:
-    ///   - string: String with ADI format.
-    ///   - delegate: Delegate object that receives messages about the parsing process.
+    ///   - string: A string with ADI format.
+    ///   - delegate: A delegate object that receives messages about the parsing process.
     public init(string: String, ADIParserDelegate delegate: (any ADIParserDelegate)? = nil) {
         self.rawString = string
         self.delegate = delegate
     }
     
-    /// Delegate object that receives messages about the parsing process.
+    /// A delegate object that receives messages about the parsing process.
     public var delegate: ADIParserDelegate?
     
     /// Start the event-driven parsing operation.
-    /// - Returns: 'true' if the parsing operation succeeds; 'false' if an error occurs.
+    /// - Returns: True if the parsing operation succeeds; false otherwise.
     public func parse() -> Bool {
         guard let _ = delegate else {
             parserError = ADIParseError.noDelegate
@@ -97,10 +97,10 @@ open class ADIParser {
         return true
     }
     
-    /// Line number of the ADI document being processed by the parser.
+    /// The line number of the ADI document being processed by the parser.
     private(set) public var lineNumber: Int = 0
     
-    /// ADIParseError object from which you can obtain information about a parsing error.
+    /// The ADIParseError object from which you can obtain information about a parsing error.
     private(set) public var parserError: Error?
 }
 
@@ -108,43 +108,43 @@ open class ADIParser {
 /// The interface an ADI parser uses to inform its delegate about the content of the parsed document.
 public protocol ADIParserDelegate {
     /// Sent by the parser object to the delegate when it begins parsing a document.
-    /// - Parameter parser: Parser object.
+    /// - Parameter parser: The parser object.
     func parserDidStartDocument(_ parser: ADIParser)
     
     /// Sent by the parser object to the delegate when it has successfully completed parsing.
-    /// - Parameter parser: Parser object.
+    /// - Parameter parser: The parser object.
     func parserDidEndDocument(_ parser: ADIParser)
     
     /// Sent by a parser object to its delegate when it encounters a given ADI data-specifier.
     /// - Parameters:
-    ///   - parser: Parser object.
-    ///   - fieldName: Field name of the data-specifier.
-    ///   - dataLength: Data length of the data-specifier.
-    ///   - dataType: data type indicator of the data-specifier.
+    ///   - parser: The parser object.
+    ///   - fieldName: The field name of the data-specifier.
+    ///   - dataLength: the data length of the data-specifier.
+    ///   - dataType: The data type indicator of the data-specifier.
     func parser(_ parser: ADIParser, didStartDataSpecifier fieldName: String, dataLength: Int?, dataType: String?)
     
     /// Sent by a parser object to its delegate after parsing the given data-specifier.
     /// - Parameters:
-    ///   - parser: Parser object.
-    ///   - fieldName: Field name of the current data-specifier.
+    ///   - parser: the parser object.
+    ///   - fieldName: The field name of the current data-specifier.
     func parser(_ parser: ADIParser, didEndDataSpecifier fieldName: String)
     
     /// Sent by a parser object to provide its delegate with a string representing all of the data of the current data-specifier.
     /// - Parameters:
-    ///   - parser: Parser object.
-    ///   - string: String that is a complete textual content of the current data-specifier.
+    ///   - parser: The parser object.
+    ///   - string: The string that is a complete textual content of the current data-specifier.
     func parser(_ parser: ADIParser, foundData string: String)
     
     /// Sent by a parser object to its delegate when it encounters non-white-space charactors that doesn't belogn to data-specifiers.
     /// - Parameters:
-    ///   - parser: Parser object
-    ///   - comment: String that is a non-data-specifier text in the ADI document.
+    ///   - parser: The parser object
+    ///   - comment: The string that is a non-data-specifier text in the ADI document.
     func parser(_ parser: ADIParser, foundComment comment: String)
     
     /// Sent by a parser object to its delegate when it encounters a fatal error.
     /// - Parameters:
-    ///   - parser: Parser object.
-    ///   - parseError: ADIParseError object describing the parsing error that occurred.
+    ///   - parser: The parser object.
+    ///   - parseError: The ADIParseError object describing the parsing error that occurred.
     func parser(_ parser: ADIParser, parseErrorOccurred parseError: Error)
 }
 

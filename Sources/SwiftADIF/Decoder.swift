@@ -22,10 +22,9 @@ enum DecodeError: Error, LocalizedError {
 
 protocol Decoder {
     // Return values
-    var headerFields: [String: String] { get }
-    var userdefs: [String: ADIF.FieldType] { get }
-    var appdefs: [String: ADIF.FieldType] { get }
-    var records: [[String: String]] { get }
+    var headerFields: [String: ADIF.Field] { get }
+    var userdefs: [String: ADIF.Field] { get }
+    var records: [ADIF.Record] { get }
     
     // Decoding
     func decode() throws
@@ -34,75 +33,93 @@ protocol Decoder {
 
 class ADIDecoder: Decoder, ADIParserDelegate {
     // Return values
-    private(set) var headerFields: [String: String] = [:]
-    private(set) var userdefs: [String: ADIF.FieldType] = [:]
-    private(set) var appdefs: [String: ADIF.FieldType] = [:]
-    private(set) var records: [[String: String]]  = []
+    private(set) var headerFields: [String: ADIF.Field] = [:]
+    private(set) var userdefs: [String: ADIF.Field] = [:]
+    private(set) var records: [ADIF.Record]  = []
     
     private var parser: ADIParser
-    private var record: [String: String] = [:]
-    private var field = ADIF.FieldType(name: "")
+    private var record = ADIF.Record(id: 0)
+    private var field = ADIF.Field(name: "")
+    private var inHead: Bool = false
     
     init(adiString: String) {
         self.parser = ADIParser(string: adiString)
     }
     
     func parser(_ parser: ADIParser, didStartDataSpecifier fieldName: String, dataLength: Int?, dataType: String?) {
-        self.field = ADIF.FieldType(name: fieldName, type: dataType)
+        self.field = ADIF.Field(name: fieldName)
+        if let _ = dataType {
+            field.TYPE = dataType
+        }
         
         // Application-defined field
         if let match = fieldName.wholeMatch(of: ADIFRegexGen.ADIFormat.appdefFieldName) {
-            let type: String = dataType ?? "M"
-            field = ADIF.FieldType(APP: "APP", programid: match.1, fieldname: match.2, type: type)
-            if !appdefs.keys.contains(field.displayName) {
-                appdefs[field.displayName] = field
-            }
+            field = ADIF.Field(name: "APP")
+            field.PROGRAMID = match.1
+            field.FIELDNAME = match.2
+            field.TYPE = dataType ?? "M"
         }
         
         // User-defined field in header
         if let match = fieldName.firstMatch(of: #/^(?:USERDEF|userdef)(\d+)/#) {
-            field = ADIF.FieldType(USERDEF: "USERDEF", fieldid: Int64(match.1)!, type: dataType)
+            inHead = true
+            field = ADIF.Field(name: "USERDEF")
+            field.FIELDID = String(match.1)
+            if let _ = dataType {
+                field.TYPE = dataType
+            }
         }
-
+        
+        // User-defined field in record
+        if userdefs.keys.contains(fieldName) {
+            field = ADIF.Field(name: "USERDEF")
+            field.FIELDNAME = fieldName
+        }
     }
     
     func parser(_ parser: ADIParser, foundData string: String) {
         // Convert CRLF to LF
         let str = string.replacingOccurrences(of: "\r\n", with: "\n")
+        field.data = str
         
         switch field.name {
-            // User-defiend field in header
+            // User-defiend field
             case "USERDEF":
-                let userdefDataRe = Regex {
-                    Capture { ADIFRegexGen.DataSpecifier.fieldName }
-                    ","
-                    Capture { ADIFRegexGen.ADIFormat.userdefEnum }
-                }
-                if let match = str.firstMatch(of: userdefDataRe) {
-                    field.fieldname = String(match.1)
-                    if let _ = match.2.wholeMatch(of: ADIFRegexGen.ADIFormat.userdefRange) {
-                        field.range = String(match.2)
-                    } else {
-                        field.enum_ = String(match.2)
+                if inHead {
+                    let userdefDataRe = Regex {
+                        Capture { ADIFRegexGen.DataSpecifier.fieldName }
+                        ","
+                        Capture { ADIFRegexGen.ADIFormat.userdefEnum }
+                    }
+                    if let match = str.firstMatch(of: userdefDataRe) {
+                        field.data = String(match.1)
+                        if let _ = match.2.wholeMatch(of: ADIFRegexGen.ADIFormat.userdefRange) {
+                            field.RANGE = String(match.2)
+                        } else {
+                            field.ENUM = String(match.2)
+                        }
                     }
                 } else {
-                    field.fieldname = str
+                    fallthrough
                 }
             default:
-                record[field.displayName] = str
+                record.fields[field.displayName] = field
         }
     }
     
     func parser(_ parser: ADIParser, didEndDataSpecifier fieldName: String) {
         switch field.name {
             case "USERDEF":
-                userdefs[field.displayName] = field
+                if inHead {
+                    userdefs[field.displayName] = field
+                }
             case "EOH":
-                headerFields = record
-                record = [:]
+                headerFields = record.fields
+                inHead = false
+                record = ADIF.Record(id: 0)
             case "EOR":
                 records.append(record)
-                record = [:]
+                record = record.newRecord()
             default:
                 break
         }
@@ -121,15 +138,14 @@ class ADIDecoder: Decoder, ADIParserDelegate {
 
 class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
     // Return values
-    private(set) var headerFields: [String: String] = [:]
-    private(set) var userdefs: [String: ADIF.FieldType] = [:]
-    private(set) var appdefs: [String: ADIF.FieldType] = [:]
-    private(set) var records: [[String: String]]  = []
-
-    private var namespace: [String] = []
+    private(set) var headerFields: [String: ADIF.Field] = [:]
+    private(set) var userdefs: [String: ADIF.Field] = [:]
+    private(set) var records: [ADIF.Record]  = []
+    
     private var parser: XMLParser
-    private var record: [String: String] = [:]
-    private var field = ADIF.FieldType(name: "")
+    private var record = ADIF.Record(id: 0)
+    private var field = ADIF.Field(name: "")
+    private var namespace: [String] = []
 
     init(adxString: String) {
         let data = Data(adxString.utf8)
@@ -142,19 +158,8 @@ class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
         switch elementName {
             case "ADX", "HEADER", "RECORDS", "RECORD":
                 break
-            case "APP":
-                field = ADIF.FieldType(APP: "APP", programid: attributeDict["PROGRAMID"]!, fieldname: attributeDict["FIELDNAME"]!, type: attributeDict["TYPE"]!)
-                if !appdefs.keys.contains(field.displayName) {
-                    appdefs[field.displayName] = field
-                }
-            case "USERDEF":
-                if namespace.contains("HEADER") {
-                    field = ADIF.FieldType(USERDEF: "USERDEF", fieldid: Int64(attributeDict["FIELDID"]!)!, type: attributeDict["TYPE"]!, enum_: attributeDict["ENUM"], range: attributeDict["RANGE"])
-                } else {
-                    field = ADIF.FieldType(name: "USERDEF", fieldname: attributeDict["FIELDNAME"]!)
-                }
             default:
-                field = ADIF.FieldType(name: elementName)
+                field = ADIF.Field(name: elementName, attr: attributeDict)
         }
     }
 
@@ -165,17 +170,11 @@ class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
         switch namespace.last {
             case "ADX", "HEADER", "RECORDS", "RECORD":
                 break
-            case "USERDEF":
-                if namespace.contains("HEADER") {
-                    field.fieldname = str
+            default:  // APP, USERDEF and other ADIF-difiend fields
+                if let _ = field.data {
+                    field.data! += str
                 } else {
-                    record[field.displayName] = str
-                }
-            default:  // APP and other ADIF-difiend fields
-                if let _ = record[field.displayName] {
-                    record[field.displayName]! += str
-                } else {
-                    record[field.displayName] = str
+                    field.data = str
                 }
         }
     }
@@ -187,21 +186,21 @@ class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
             case "ADX":
                 break
             case "HEADER":
-                headerFields = record
-                record = [:]
+                headerFields = record.fields
+                record = ADIF.Record(id: 0)
             case "RECORDS":
                 break
             case "RECORD":
                 records.append(record)
-                record = [:]
-            case "APP":
-                break
+                record = record.newRecord()
             case "USERDEF":
                 if namespace.contains("HEADER") {
                     userdefs[field.displayName] = field
+                } else {
+                    fallthrough
                 }
-            default:
-                break
+            default:  // APP and other ADIF-difiend fields
+                record.fields[field.displayName] = field
         }
     }
 

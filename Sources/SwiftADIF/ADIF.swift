@@ -1,149 +1,150 @@
 import Foundation
 import TabularData
 
-/// Simple Amateur Data Interchange Format (ADIF) parser.
-open class ADIF {
-    /// ADIF header contents.
-    public var header: Header
-    /// ADIF record contents.
-    public var records: Records
+/// An Amateur Data Interchange Format (ADIF) object.
+public struct ADIF {
+    /// An ADIF header object.
+    public var header: Header = Header()
+    /// ADIF records.
+    public var records: [Record] = []
+    /// The maximun number of the reicords 'id'.
+    public var maxRecordId: Int? = nil
     
-    private static let minField = ["QSO_DATE", "TIME_ON", "CALL", "BAND", "FREQ", "MODE"]
     
-    /// Initialize a ADIF with ADI document.
-    /// - Parameter adiString: String of an ADI document.
+    /// Creates a new empty instance of an ADIF.
+    public init() { }
+    
+    
+    /// Creates a new instance of an ADIF from an ADI string.
+    /// - Parameter adiString: A string of an ADI document.
     public init?(adiString: String) {
         let decoder = ADIDecoder(adiString: adiString)
         do {
-            (header, records) = try Self.getContents(decoder: decoder)
+            try decoder.decode()
+            header = Header(fields: decoder.headerFields, userdefs: decoder.userdefs)
+            records = decoder.records
+            maxRecordId = records.last?.id
         } catch {
             return nil
         }
     }
     
-    /// Initialize a ADIF with ADX document.
-    /// - Parameter adxString: String of an ADX document.
+    
+    /// Creates a new instance of an ADIF from an ADX string.
+    /// - Parameter adxString: A string of an ADX document.
     public init?(adxString: String) {
         let decoder = ADXDecoder(adxString: adxString)
         do {
-            (header, records) = try Self.getContents(decoder: decoder)
+            try decoder.decode()
+            header = Header(fields: decoder.headerFields, userdefs: decoder.userdefs)
+            records = decoder.records
+            maxRecordId = records.last?.id
         } catch {
             return nil
         }
     }
+        
     
-    private static func getContents(decoder: any Decoder) throws -> (Header, Records) {
-        // Decode
-        try decoder.decode()
+    /// An ADIF header object that contains header fields and user-defined field definitions.
+    @dynamicMemberLookup public struct Header {
+        /// A dictionary of header fields with their field names.
+        public var fields: [String: Field] = [:]
         
-        // Initialize Header
-        let header = Header(fields: decoder.headerFields, userdefs: decoder.userdefs, appdefs: decoder.appdefs)
+        /// A dictionary of user-defined fields with  their display names.
+        public var userdefs: [String: Field] = [:]
         
-        // Initialize Records
-        var fieldNames = minField
-        var names: Set<String> = []
-        decoder.records.forEach { names.formUnion($0.keys) }
-        names.subtract(Set(minField))
-        fieldNames += Array(names)
-        
-        var records = Records()
-        fieldNames.forEach { name in
-            var col = Column<String>(name: name, capacity: 0)
-            decoder.records.forEach { col.append(contentsOf: [$0[name] ?? ""]) }
-            records.append(column: col)
+        public subscript(dynamicMember key: String) -> Field? {
+            get { fields[key] }
+            set { fields[key] = newValue }
         }
-        
-        return (header, records)
     }
     
-    /// ADIF header contens that contains header fields, user-defined field definitions, and application-defined field definitions.
-    @dynamicMemberLookup public struct Header {
-        /// Dictionary of header field  data with their field name.
-        public var fields: [String: String] = [:]
-        /// Dictionary of user-defined fields with  their display name.
-        public var userdefs: [String: FieldType] = [:]
-        /// Dictioanry of application-defined fields with their display name.
-        public var appdefs: [String: FieldType] = [:]
+    
+    /// An ADIF record object.
+    @dynamicMemberLookup public struct Record {
+        public let id: Int
         
-        public subscript(dynamicMember key: String) -> String? {
+        /// A dictionary of QSO fields with their field names.
+        public var fields: [String: Field] = [:]
+        
+        public subscript(dynamicMember key: String) -> Field? {
             get { fields[key] }
             set { fields[key] = newValue }
         }
         
-        /// Array of header field names stored in Header.fields.
-        public var fieldNames: [String] {
-            Array(fields.keys)
+        func newRecord() -> Self {
+            return Self(id: id + 1)
         }
     }
     
     
-    public typealias Records = DataFrame
-    
-    
-    /// Field definition.
-    public struct FieldType: Equatable {
-        /// ADIF field name including "APP" and "USERDEF".
+    /// An ADIF field object.
+    @dynamicMemberLookup public struct Field: Identifiable {
+        public let id = UUID()
+        
+        /// The field name including "APP" and "USERDEF" (i.e. element name of ADX).
         public let name: String
-        /// Data type indicator.
-        public let type: String?
         
-        /// Application- or User-defiend field name.
-        public var fieldname: String? {
-            didSet { fieldname = fieldname?.uppercased() }
+        /// A data value.
+        public var data: String? = nil
+        
+        /// Optional attributes, especially for application- and user-defined fields (e.g. TYPE, FIELDNAME, PROGRAMID, FIELDID, ENUM, RANGE).
+        public var attr: [String: String] {
+            get {
+                return _attr
+            }
+            set {
+                let keys = newValue.keys
+                keys.forEach { key in
+                    let upperKey = key.uppercased()
+                    switch upperKey {
+                        case "TYPE", "ENUM":
+                            _attr[upperKey] = newValue[key]!.uppercased()
+                        default:
+                            _attr[upperKey] = newValue[key]
+                    }
+                }
+            }
         }
         
-        // For application-defined fields
-        /// Name of application will process the ADIF file in which the application-defined field appears.
-        public var programid: String? {
-            didSet { programid = programid?.uppercased() }
+        private var _attr: [String: String] = [:]
+        
+        public subscript(dynamicMember key: String) -> String? {
+            get { attr[key] }
+            set { attr[key] = newValue }
         }
         
-        // For user-defined fields
-        /// User-defined field index
-        public var fieldid: Int64?
-        /// User-defined field data enumeration which is a comma-delimited list of string enclosed in curly brackets.
-        public var enum_: String? {
-            didSet { enum_ = enum_?.uppercased() }
+        /// Creates a new instance of a field.
+        /// - Parameters:
+        ///   - name: The field name.
+        ///   - data: A string of the field data value.
+        ///   - attr: Attributes for the field.
+        public init(name: String, data: String? = nil, attr: [String : String] = [:]) {
+            self.name = name.uppercased()
+            self.data = data
+            self.attr = attr
         }
-        /// User-defined field data range which is a lower bound and a larger upper bound separated by a colon enclosed in curly brackets.
-        public var range: String?
         
-        /// Display name of the field which is same as the ADI data-specifier field name.
+        /// The display name of the field which is same as the ADI data-specifier field name.
         ///
         /// The display name is same as their field name except application- and user-defined fields.
-        /// In the case of application-defined field, their display name 'APP_*PROGRAMID_FIELDNAME*'.
-        /// The display name of user-defined fieid is same as their field name.
+        /// In the case of application-defined field, their display name is 'APP_*PROGRAMID_FIELDNAME*'.
+        /// The display name of user-defined fieid is same as their FIELDNAME.
         public var displayName: String {
             switch name {
                 case "APP":
                     // Return "APP_PROGRAMID_FIELDNAME"
-                    return [name, programid!, fieldname!].joined(separator: "_")
+                    return [name, attr["PROGRAMID"]!, attr["FIELDNAME"]!].joined(separator: "_").uppercased()
                 case "USERDEF":
-                    return fieldname!
+                    if let fieldname = attr["FIELDNAME"] {
+                        return fieldname.uppercased()
+                    } else {
+                        return data!.uppercased()
+                    }
                 default:
                     return name.uppercased()
             }
-            
-        }
-        
-        init(APP name: String = "APP", programid: String, fieldname: String, type: String? = nil) {
-            self.init(name: "APP", type: type, fieldname: fieldname, programid: programid, fieldid: nil, enum_: nil,
-                      range: nil)
-        }
-        
-        init(USERDEF name: String = "USERDEF", fieldid: Int64, type: String? = nil, fieldname: String? = nil, enum_: String? = nil, range: String? = nil) {
-            self.init(name: "USERDEF", type: type, fieldname: fieldname, programid: nil, fieldid: fieldid, enum_: enum_,
-                      range: range)
-        }
-        
-        init(name: String, type: String? = nil, fieldname: String? = nil, programid: String? = nil, fieldid: Int64? = nil, enum_: String? = nil, range: String? = nil) {
-            self.name = name.uppercased()
-            self.type = type?.uppercased()
-            self.programid = programid?.uppercased()
-            self.fieldname = fieldname?.uppercased()
-            self.fieldid = fieldid
-            self.enum_ = enum_?.uppercased()
-            self.range = range
         }
     }
+    
 }

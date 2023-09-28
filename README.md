@@ -7,5 +7,5 @@
 
 This package currently provides the following libraries:
 
-- **SwiftADIF**: Parse ADI and ADX document and store the contents in a DataFrame object.
+- **SwiftADIF**: An ADIF object.
 - **ADIParser**: An event driven parser of ADI documents.
