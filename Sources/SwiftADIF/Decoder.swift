@@ -42,8 +42,8 @@ class ADIDecoder: Decoder, ADIParserDelegate {
     private var field = ADIF.Field(name: "")
     private var inHead: Bool = false
     
-    init(adiString: String) {
-        self.parser = ADIParser(string: adiString)
+    init(string: String) {
+        self.parser = ADIParser(string: string)
     }
     
     func parser(_ parser: ADIParser, didStartDataSpecifier fieldName: String, dataLength: Int?, dataType: String?) {
@@ -147,8 +147,8 @@ class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
     private var field = ADIF.Field(name: "")
     private var namespace: [String] = []
 
-    init(adxString: String) {
-        let data = Data(adxString.utf8)
+    init(string: String) {
+        let data = Data(string.utf8)
         self.parser = XMLParser(data: data)
     }
 

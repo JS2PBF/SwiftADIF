@@ -3,22 +3,27 @@ import TabularData
 
 /// An Amateur Data Interchange Format (ADIF) object.
 public struct ADIF {
+    /*
+     * Properties
+     */
     /// An ADIF header object.
     public var header: Header = Header()
     /// ADIF records.
     public var records: [Record] = []
     /// The maximun number of the reicords 'id'.
-    public var maxRecordId: Int? = nil
+    var maxRecordId: Int? = nil
     
     
+    /*
+     * Initializers
+     */
     /// Creates a new empty instance of an ADIF.
     public init() { }
-    
     
     /// Creates a new instance of an ADIF from an ADI string.
     /// - Parameter adiString: A string of an ADI document.
     public init?(adiString: String) {
-        let decoder = ADIDecoder(adiString: adiString)
+        let decoder = ADIDecoder(string: adiString)
         do {
             try decoder.decode()
             header = Header(fields: decoder.headerFields, userdefs: decoder.userdefs)
@@ -29,11 +34,10 @@ public struct ADIF {
         }
     }
     
-    
     /// Creates a new instance of an ADIF from an ADX string.
     /// - Parameter adxString: A string of an ADX document.
     public init?(adxString: String) {
-        let decoder = ADXDecoder(adxString: adxString)
+        let decoder = ADXDecoder(string: adxString)
         do {
             try decoder.decode()
             header = Header(fields: decoder.headerFields, userdefs: decoder.userdefs)
@@ -44,7 +48,42 @@ public struct ADIF {
         }
     }
         
+        
+    /*
+     * Methods
+     */
+    /// Sort the records in order of appearance in the file.
+    /// - Parameter reverse: If true, sort records in decreasing order. If false, sort them in increasing order.
+    mutating public func sortById(reverse: Bool = false) {
+        records.sort { (lRec, rRec) in
+            return reverse ? lRec.id > rRec.id : lRec.id < rRec.id
+        }
+    }
     
+    /// Sort the records by "QSO\_DATE" and "TIME\_ON".
+    /// - Parameter reverse: If true, sort records in decreasing order. If false, sort them in increasing order.
+    mutating public func sortByDatetime(reverse: Bool = false) {
+        records.sort { (lRec, rRec) in
+            let lval = (lRec.fields["QSO_DATE"]?.data ?? "00000000") + (lRec.fields["TIME_ON"]?.data ?? "000000")
+            let rval = (rRec.fields["QSO_DATE"]?.data ?? "00000000") + (rRec.fields["TIME_ON"]?.data ?? "000000")
+            return reverse ? lval > rval : lval < rval
+        }
+    }
+
+    /// Sort the records by "CALL".
+    /// - Parameter reverse: If true, sort records in decreasing order. If false, sort them in increasing order.
+    mutating public func sortByCall(reverse: Bool = false) {
+        records.sort { (lRec, rRec) in
+            let lval = (lRec.fields["CALL"]?.data ?? "").uppercased()
+            let rval = (rRec.fields["CALL"]?.data ?? "").uppercased()
+            return reverse ? lval > rval : lval < rval
+        }
+    }
+        
+    
+    /*
+     * Child objects
+     */
     /// An ADIF header object that contains header fields and user-defined field definitions.
     @dynamicMemberLookup public struct Header {
         /// A dictionary of header fields with their field names.
@@ -62,7 +101,7 @@ public struct ADIF {
     
     /// An ADIF record object.
     @dynamicMemberLookup public struct Record {
-        public let id: Int
+        let id: Int
         
         /// A dictionary of QSO fields with their field names.
         public var fields: [String: Field] = [:]
@@ -128,7 +167,7 @@ public struct ADIF {
         /// The display name of the field which is same as the ADI data-specifier field name.
         ///
         /// The display name is same as their field name except application- and user-defined fields.
-        /// In the case of application-defined field, their display name is 'APP_*PROGRAMID_FIELDNAME*'.
+        /// In the case of application-defined field, their display name is 'APP\_*PROGRAMID*\_*FIELDNAME*'.
         /// The display name of user-defined fieid is same as their FIELDNAME.
         public var displayName: String {
             switch name {
