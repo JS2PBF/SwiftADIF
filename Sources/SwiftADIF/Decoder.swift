@@ -24,6 +24,7 @@ protocol Decoder {
     // Return values
     var headerFields: [String: ADIF.Field] { get }
     var userdefs: [String: ADIF.Field] { get }
+    var appdefs: [String: ADIF.Field] { get }
     var records: [ADIF.Record] { get }
     
     // Decoding
@@ -35,6 +36,7 @@ class ADIDecoder: Decoder, ADIParserDelegate {
     // Return values
     private(set) var headerFields: [String: ADIF.Field] = [:]
     private(set) var userdefs: [String: ADIF.Field] = [:]
+    private(set) var appdefs: [String: ADIF.Field] = [:]
     private(set) var records: [ADIF.Record]  = []
     
     private var parser: ADIParser
@@ -58,6 +60,8 @@ class ADIDecoder: Decoder, ADIParserDelegate {
             field.PROGRAMID = match.1
             field.FIELDNAME = match.2
             field.TYPE = dataType ?? "M"
+            
+            appdefs[field.displayName] = field
         }
         
         // User-defined field in header
@@ -140,6 +144,7 @@ class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
     // Return values
     private(set) var headerFields: [String: ADIF.Field] = [:]
     private(set) var userdefs: [String: ADIF.Field] = [:]
+    private(set) var appdefs: [String: ADIF.Field] = [:]
     private(set) var records: [ADIF.Record]  = []
     
     private var parser: XMLParser
@@ -158,6 +163,11 @@ class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
         switch elementName {
             case "ADX", "HEADER", "RECORDS", "RECORD":
                 break
+            case "APP":
+                field = ADIF.Field(name: elementName, attr: attributeDict)
+                if appdefs[field.displayName] == nil {
+                    appdefs[field.displayName] = field
+                }
             default:
                 field = ADIF.Field(name: elementName, attr: attributeDict)
         }
@@ -171,11 +181,7 @@ class ADXDecoder: NSObject, Decoder, XMLParserDelegate {
             case "ADX", "HEADER", "RECORDS", "RECORD":
                 break
             default:  // APP, USERDEF and other ADIF-difiend fields
-                if let _ = field.data {
-                    field.data! += str
-                } else {
-                    field.data = str
-                }
+                field.data = (field.data ?? "") + str
         }
     }
 

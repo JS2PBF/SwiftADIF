@@ -26,7 +26,10 @@ public struct ADIF {
         let decoder = ADIDecoder(string: adiString)
         do {
             try decoder.decode()
-            header = Header(fields: decoder.headerFields, userdefs: decoder.userdefs)
+            header = Header(
+                fields: decoder.headerFields,
+                userdefs: decoder.userdefs,
+                appdefs: decoder.appdefs)
             records = decoder.records
             maxRecordId = records.last?.id
         } catch {
@@ -40,7 +43,10 @@ public struct ADIF {
         let decoder = ADXDecoder(string: adxString)
         do {
             try decoder.decode()
-            header = Header(fields: decoder.headerFields, userdefs: decoder.userdefs)
+            header = Header(
+                fields: decoder.headerFields,
+                userdefs: decoder.userdefs,
+                appdefs: decoder.appdefs)
             records = decoder.records
             maxRecordId = records.last?.id
         } catch {
@@ -91,6 +97,9 @@ public struct ADIF {
         
         /// A dictionary of user-defined fields with  their display names.
         public var userdefs: [String: Field] = [:]
+        
+        /// A dictionary of application-defined fields with  their display names.
+        public var appdefs: [String: Field] = [:]
         
         public subscript(dynamicMember key: String) -> Field? {
             get { fields[key] }

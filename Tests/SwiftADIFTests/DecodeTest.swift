@@ -9,7 +9,7 @@ final class ADIDecoderTest: XCTestCase {
             <BAND:2>2M
             <EOR>
         """
-        let decoder = ADIDecoder(adiString: input)
+        let decoder = ADIDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
@@ -18,6 +18,7 @@ final class ADIDecoderTest: XCTestCase {
         
         XCTAssertTrue(decoder.headerFields.isEmpty)
         XCTAssertTrue(decoder.userdefs.isEmpty)
+        XCTAssertTrue(decoder.appdefs.isEmpty)
         XCTAssertEqual(decoder.records.count, 1)
         
         let rec = decoder.records.first!
@@ -28,7 +29,7 @@ final class ADIDecoderTest: XCTestCase {
     
     func testMultilineField() throws {
         let input = "<ADDRESS:20>Nagoya\r\nAichi\r\nJapan\r\n<EOR>"
-        let decoder = ADIDecoder(adiString: input)
+        let decoder = ADIDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
@@ -43,12 +44,14 @@ final class ADIDecoderTest: XCTestCase {
             <app_monolog_compression:3>off
             <eor>
         """
-        let decoder = ADIDecoder(adiString: input)
+        let decoder = ADIDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
             XCTFail()
         }
+        XCTAssertEqual(Set(decoder.appdefs.keys), Set(["APP_MONOLOG_COMPRESSION"]))
+        
         let answer = decoder.records.first!.APP_MONOLOG_COMPRESSION!
         XCTAssertEqual(answer.data, "off")
         XCTAssertEqual(answer.PROGRAMID, "monolog")
@@ -67,7 +70,7 @@ final class ADIDecoderTest: XCTestCase {
 
             <EOH>
         """
-        let decoder = ADIDecoder(adiString: input)
+        let decoder = ADIDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
@@ -97,7 +100,7 @@ final class ADIDecoderTest: XCTestCase {
             return XCTFail()
         }
 
-        let decoder = ADIDecoder(adiString: input)
+        let decoder = ADIDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
@@ -121,7 +124,7 @@ final class ADXDecoderTest: XCTestCase {
                 </RECORDS>
             </ADX>
         """
-        let decoder = ADXDecoder(adxString: input)
+        let decoder = ADXDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
@@ -130,6 +133,7 @@ final class ADXDecoderTest: XCTestCase {
         
         XCTAssertTrue(decoder.headerFields.isEmpty)
         XCTAssertTrue(decoder.userdefs.isEmpty)
+        XCTAssertTrue(decoder.appdefs.isEmpty)
         XCTAssertEqual(decoder.records.count, 1)
         
         let rec = decoder.records.first!
@@ -140,7 +144,7 @@ final class ADXDecoderTest: XCTestCase {
     
     func testMultilineField() throws {
         let input = "<ADX><RECORDS><RECORD><ADDRESS>Nagoya\r\nAichi\r\nJapan</ADDRESS></RECORD></RECORDS></ADX>"
-        let decoder = ADXDecoder(adxString: input)
+        let decoder = ADXDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
@@ -156,12 +160,14 @@ final class ADXDecoderTest: XCTestCase {
                 <APP PROGRAMID="MONOLOG" FIELDNAME="BIRTHDAY" TYPE="d">19470726</APP>
             </RECORD></RECORDS></ADX>
         """#
-        let decoder = ADXDecoder(adxString: input)
+        let decoder = ADXDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
             XCTFail()
         }
+        XCTAssertEqual(Set(decoder.appdefs.keys), Set(["APP_MONOLOG_BIRTHDAY"]))
+        
         let answer = decoder.records.first!.APP_MONOLOG_BIRTHDAY!
         XCTAssertEqual(answer.data, "19470726")
         XCTAssertEqual(answer.PROGRAMID, "MONOLOG")
@@ -180,7 +186,7 @@ final class ADXDecoderTest: XCTestCase {
                 <USERDEF FIELDID="3" TYPE="N" RANGE="{5:20}">SHOESIZE</USERDEF>
             </HEADER></ADX>
         """
-        let decoder = ADXDecoder(adxString: input)
+        let decoder = ADXDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
@@ -210,7 +216,7 @@ final class ADXDecoderTest: XCTestCase {
             return XCTFail()
         }
 
-        let decoder = ADXDecoder(adxString: input)
+        let decoder = ADXDecoder(string: input)
         do {
             try decoder.decode()
         } catch {
