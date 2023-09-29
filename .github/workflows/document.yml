@@ -9,29 +9,28 @@ on:
     branches: [ main ]
 
 
-permissions:
-  pages: write
-  id-token: write
-  contents: read
-
 jobs:
   build:
     runs-on: macos-13
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build DocC
         run: |
-          swift package --allow-writing-to-directory ./docs generate-documentation \
+          swift package --allow-writing-to-directory ./docs \
+          generate-documentation --target SwiftADIF \
           --disable-indexing \
-          --output-path ./docs \
           --transform-for-static-hosting \
-          --hosting-base-path SwiftADIF
+          --hosting-base-path SwiftADIF \
+          --output-path ./docs
       - uses: actions/upload-pages-artifact@v2
         with:
           path: docs
 
   deploy:
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
