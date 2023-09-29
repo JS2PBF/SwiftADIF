@@ -10,7 +10,7 @@ on:
 
 
 jobs:
-  build:
+  builds:
     name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
     strategy:
       matrix:
@@ -27,7 +27,7 @@ jobs:
       - name: Run tests
         run: swift test -v
 
-  build:
+  build1:
     name: Swift 5.7 on macos-12
     runs-on: mocos-12
     steps:
