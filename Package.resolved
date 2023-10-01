@@ -17,6 +17,15 @@
         "revision" : "b45d1f2ed151d057b54504d653e0da5552844e34",
         "version" : "1.0.0"
       }
+    },
+    {
+      "identity" : "swiftadiparser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/JS2PBF/SwiftADIParser/",
+      "state" : {
+        "revision" : "272e7f0e2bb96d9dc68b8ba3d76ec7bb56465167",
+        "version" : "1.0.0"
+      }
     }
   ],
   "version" : 2

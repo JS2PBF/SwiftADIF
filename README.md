@@ -3,9 +3,10 @@
 **SwiftADIF** is a Swift package for the Amateur Data Interchange Format (ADIF).
 
 
-## Contents
+## Requirement
 
-This package currently provides the following libraries:
+- Swift >= 5.7
 
-- **SwiftADIF**: An ADIF object.
-- **ADIParser**: An event driven parser of ADI documents.
+
+## Usage
+See the [package documents](https://js2pbf.github.io/SwiftADIF/documentation/swiftadif/).

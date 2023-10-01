@@ -1,7 +1,7 @@
 import Foundation
 import RegexBuilder
 
-import ADIParser
+import SwiftADIParser
 import ADIFValidator
 
 
