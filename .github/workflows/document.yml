@@ -10,7 +10,7 @@ on:
 
 
 jobs:
-  build-swiftadif:
+  build:
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
@@ -25,25 +25,9 @@ jobs:
       - uses: actions/upload-pages-artifact@v2
         with:
           path: docs
-          
-  build-adiparser:
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build DocC
-        run: |
-          swift package --allow-writing-to-directory ./docs \
-          generate-documentation --target ADIParser \
-          --disable-indexing \
-          --transform-for-static-hosting \
-          --hosting-base-path SwiftADIF \
-          --output-path ./docs
-      - uses: actions/upload-pages-artifact@v2
-        with:
-          path: docs
 
   deploy:
-    needs: [build-swiftadif, build-adiparser]
+    needs: build
     permissions:
       pages: write
       id-token: write
