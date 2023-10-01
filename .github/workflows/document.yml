@@ -17,7 +17,7 @@ jobs:
       - name: Build ADIParser
         run: |
           swift package --allow-writing-to-directory ./docs \
-          generate-documentation --target ADIParser\
+          generate-documentation --target ADIParser \
           --disable-indexing \
           --transform-for-static-hosting \
           --hosting-base-path SwiftADIF \
