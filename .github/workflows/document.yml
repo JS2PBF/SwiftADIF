@@ -14,6 +14,14 @@ jobs:
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
+      - name: Build SwiftADIF
+        run: |
+          swift package --allow-writing-to-directory ./docs \
+          generate-documentation --target SwiftADIF \
+          --disable-indexing \
+          --transform-for-static-hosting \
+          --hosting-base-path SwiftADIF \
+          --output-path ./docs
       - name: Build ADIParser
         run: |
           swift package --allow-writing-to-directory ./docs \
