@@ -41,91 +41,81 @@ class ADIDecoder: Decoder, ADIParserDelegate {
     
     private var parser: ADIParser
     private var record = ADIF.Record(id: 0)
-    private var field = ADIF.Field(name: "")
-    private var inHead: Bool = false
     
     init(string: String) {
         self.parser = ADIParser(string: string)
     }
     
-    func parser(_ parser: ADIParser, didStartDataSpecifier fieldName: String, dataLength: Int?, dataType: String?) {
-        self.field = ADIF.Field(name: fieldName)
-        if let _ = dataType {
-            field.TYPE = dataType
-        }
+    func parser(_ parser: ADIParser, foundDataSpecifier fieldName: String, dataLength: Int?, dataType: String?, data: String?) {
+        var field: ADIF.Field
         
-        // Application-defined field
-        if let match = fieldName.wholeMatch(of: ADIFRegexGen.ADIFormat.appdefFieldName) {
-            field = ADIF.Field(name: "APP")
-            field.PROGRAMID = match.1
-            field.FIELDNAME = match.2
-            field.TYPE = dataType ?? "M"
-            
-            appdefs[field.displayName] = field
-        }
+        // Convert CRLF to LF in the data
+        let dataStr = data?.replacingOccurrences(of: "\r\n", with: "\n")
         
         // User-defined field in header
         if let match = fieldName.firstMatch(of: #/^(?:USERDEF|userdef)(\d+)/#) {
-            inHead = true
-            field = ADIF.Field(name: "USERDEF")
+            field = ADIF.Field(name: "USERDEF", data: dataStr)
             field.FIELDID = String(match.1)
             if let _ = dataType {
                 field.TYPE = dataType
             }
-        }
-        
-        // User-defined field in record
-        if userdefs.keys.contains(fieldName) {
-            field = ADIF.Field(name: "USERDEF")
-            field.FIELDNAME = fieldName
-        }
-    }
-    
-    func parser(_ parser: ADIParser, foundData string: String) {
-        // Convert CRLF to LF
-        let str = string.replacingOccurrences(of: "\r\n", with: "\n")
-        field.data = str
-        
-        switch field.name {
-            // User-defiend field
-            case "USERDEF":
-                if inHead {
-                    let userdefDataRe = Regex {
-                        Capture { ADIFRegexGen.DataSpecifier.fieldName }
-                        ","
-                        Capture { ADIFRegexGen.ADIFormat.userdefEnum }
-                    }
-                    if let match = str.firstMatch(of: userdefDataRe) {
-                        field.data = String(match.1)
-                        if let _ = match.2.wholeMatch(of: ADIFRegexGen.ADIFormat.userdefRange) {
-                            field.RANGE = String(match.2)
-                        } else {
-                            field.ENUM = String(match.2)
-                        }
-                    }
+            
+            // Parse RANGE or ENUM from data
+            let userdefDataRe = Regex {
+                Capture { ADIFRegexGen.DataSpecifier.fieldName }
+                ","
+                Capture { ADIFRegexGen.ADIFormat.userdefEnum }
+            }
+            if let match = dataStr!.firstMatch(of: userdefDataRe) {
+                field.data = String(match.1)
+                if let _ = match.2.wholeMatch(of: ADIFRegexGen.ADIFormat.userdefRange) {
+                    field.RANGE = String(match.2)
                 } else {
-                    fallthrough
+                    field.ENUM = String(match.2)
                 }
-            default:
-                record.fields[field.displayName] = field
+            }
+            
+            userdefs[field.displayName] = field
         }
-    }
-    
-    func parser(_ parser: ADIParser, didEndDataSpecifier fieldName: String) {
-        switch field.name {
-            case "USERDEF":
-                if inHead {
-                    userdefs[field.displayName] = field
-                }
-            case "EOH":
-                headerFields = record.fields
-                inHead = false
-                record = ADIF.Record(id: 0)
-            case "EOR":
-                records.append(record)
-                record = record.newRecord()
-            default:
-                break
+        // Application-defined field
+        else if let match = fieldName.wholeMatch(of: ADIFRegexGen.ADIFormat.appdefFieldName) {
+            field = ADIF.Field(name: "APP", data: dataStr)
+            field.PROGRAMID = match.1
+            field.FIELDNAME = match.2
+            field.TYPE = dataType ?? "M"
+            record.fields[field.displayName] = field
+            
+            if !appdefs.keys.contains(field.displayName) {
+                appdefs[field.displayName] = field
+                appdefs[field.displayName]!.data = nil
+            }
+        }
+        // User-defined field in record
+        else if userdefs.keys.contains(fieldName) {
+            field = ADIF.Field(name: "USERDEF", data: dataStr)
+            field.FIELDNAME = fieldName
+            if let dataType = dataType {
+                field.TYPE = dataType
+            }
+            record.fields[field.displayName] = field
+        }
+        // EOH
+        else if fieldName.uppercased() == "EOH" {
+            headerFields = record.fields
+            record = ADIF.Record(id: 0)
+        }
+        // EOR
+        else if fieldName.uppercased() == "EOR" {
+            records.append(record)
+            record = record.newRecord()
+        }
+        // Default
+        else {
+            field = ADIF.Field(name: fieldName, data: dataStr)
+            if let dataType = dataType {
+                field.TYPE = dataType
+            }
+            record.fields[field.displayName] = field
         }
     }
     

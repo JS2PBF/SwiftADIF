@@ -95,10 +95,13 @@ public struct ADIF {
         /// A dictionary of header fields with their field names.
         public var fields: [String: Field] = [:]
         
-        /// A dictionary of user-defined fields with  their display names.
+        /// A dictionary of user-defined fields in the header with their display names.
         public var userdefs: [String: Field] = [:]
         
-        /// A dictionary of application-defined fields with  their display names.
+        /// A dictionary of application-defined fields in the records with their display names.
+        ///
+        /// The fields are stored in this dictionary when they first appear in the document.
+        /// The value, Field, may not contain the "data" value.
         public var appdefs: [String: Field] = [:]
         
         public subscript(dynamicMember key: String) -> Field? {
